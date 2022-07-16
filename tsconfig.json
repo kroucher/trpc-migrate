@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "rootDir": "bin",
+    "lib": ["ESNext", "DOM", "ES5", "ES6"],
+    "skipLibCheck": true,
+    "inlineSourceMap": true,
+    "jsx": "react",
+    "target": "ES2015",
+    "module": "CommonJS",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node"
+  },
+  "exclude": ["**/__tests__/*.test.ts?x", "transforms/__testfixtures__/**"]
+}
