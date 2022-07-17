@@ -5,7 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const glob_1 = require("glob");
 const ts_morph_1 = require("ts-morph");
-const fs_1 = __importDefault(require("fs"));
 const chalk_1 = __importDefault(require("chalk"));
 const discover = () => {
     console.log(chalk_1.default.green("Discovering tRPC routers..."));
@@ -16,110 +15,120 @@ const discover = () => {
         absolute: true,
     });
     console.log(chalk_1.default.green(`Found ${projectFiles.length} .ts files`));
-    const old_tRPC_Routers = [];
+    const v9Routers = new Map();
     const project = new ts_morph_1.Project();
     project.addSourceFilesAtPaths(projectFiles);
     project.getSourceFiles().forEach((sourceFile) => {
         sourceFile.getStatements().forEach((statement) => {
-            const descendants = statement.getDescendantsOfKind(ts_morph_1.ts.SyntaxKind.CallExpression);
+            const descendants = statement.getDescendantsOfKind(ts_morph_1.ts.SyntaxKind.PropertyAccessExpression);
             descendants.forEach((descendant) => {
-                var _a, _b, _c, _d, _e;
-                if (descendant.getKind() === ts_morph_1.ts.SyntaxKind.CallExpression) {
-                    const type = (_b = (_a = descendant.getReturnType().getSymbol()) === null || _a === void 0 ? void 0 : _a.getDeclaredType()) === null || _b === void 0 ? void 0 : _b.getText();
-                    if (type === null || type === void 0 ? void 0 : type.match(/.Router<TInputContext, TContext, TMeta, TQueries, TMutations, TSubscriptions, TErrorShape>/)) {
-                        // descendant is a router
-                        const expressionName = (_d = (_c = descendant
-                            .getFirstAncestorByKind(ts_morph_1.ts.SyntaxKind.VariableStatement)) === null || _c === void 0 ? void 0 : _c.getDeclarations()[0]) === null || _d === void 0 ? void 0 : _d.getName();
-                        const expressionType = (_e = descendant.getFirstAncestorByKind(ts_morph_1.ts.SyntaxKind.VariableDeclaration)) === null || _e === void 0 ? void 0 : _e.getType();
-                        if (expressionName && expressionType) {
-                            //console.log(chalk.green(`Name: ${expressionName}`));
-                            //console.log(chalk.green(`Type: ${expressionType.getSymbol()?.getName()}`));
-                            const args = descendant.getArguments();
-                            if (descendant
-                                .getExpression()
-                                .getText()
-                                .split(".")
-                                .find((x) => x === "query")) {
-                                // descendant is a query
-                                if (args) {
-                                    args.forEach((arg, i) => {
-                                        if (arg.getKind() === ts_morph_1.ts.SyntaxKind.StringLiteral) {
-                                            //console.log(chalk.green(`Query Name: ${arg.getText()}`));
-                                        }
-                                        if (arg.getKind() === ts_morph_1.ts.SyntaxKind.ObjectLiteralExpression) {
-                                            const properties = arg.getChildrenOfKind(ts_morph_1.ts.SyntaxKind.PropertyAssignment);
-                                            properties.forEach((property) => {
-                                                const name = property.getName();
-                                                const value = property.getText();
-                                                //console.log(chalk.green(`Query Prop #${i}: ${name} = ${value}`));
-                                                old_tRPC_Routers.push({
-                                                    routerName: expressionName,
-                                                    type: "query",
-                                                    query: arg.getText(),
-                                                    input: value,
-                                                });
+                var _a;
+                const identifier = descendant.getFirstChildByKind(ts_morph_1.ts.SyntaxKind.Identifier);
+                const variableDec = (_a = descendant
+                    .getFirstAncestorByKind(ts_morph_1.ts.SyntaxKind.VariableDeclaration)) === null || _a === void 0 ? void 0 : _a.getFirstChildByKind(ts_morph_1.ts.SyntaxKind.Identifier);
+                if ((identifier === null || identifier === void 0 ? void 0 : identifier.getFullText()) === "query" ||
+                    (identifier === null || identifier === void 0 ? void 0 : identifier.getFullText()) === "mutation" ||
+                    (identifier === null || identifier === void 0 ? void 0 : identifier.getFullText()) === "subscription" ||
+                    (identifier === null || identifier === void 0 ? void 0 : identifier.getFullText()) === "middleware" ||
+                    (identifier === null || identifier === void 0 ? void 0 : identifier.getFullText()) === "transformer") {
+                    descendant === null || descendant === void 0 ? void 0 : descendant.getNextSiblings().forEach((sibling) => {
+                        if (sibling.getKind() === ts_morph_1.ts.SyntaxKind.SyntaxList) {
+                            sibling.getChildren().forEach((child) => {
+                                if (child.getKind() === ts_morph_1.ts.SyntaxKind.StringLiteral) {
+                                    console.log(chalk_1.default.blue(`${identifier.getFullText()} name: ${child.getText()}\n`));
+                                    if (variableDec && child && identifier.getFullText() === "query") {
+                                        const existingRouter = v9Routers.get(variableDec.getFullText());
+                                        if (existingRouter) {
+                                            console.log("router exists");
+                                            existingRouter.methods.push({
+                                                index: existingRouter.methods.length,
+                                                type: [{ name: child.getText(), type: "query" }],
                                             });
                                         }
-                                    });
-                                }
-                            }
-                            if (descendant
-                                .getExpression()
-                                .getText()
-                                .split(".")
-                                .find((x) => x === "mutation")) {
-                                // descendant is a mutation
-                                if (args) {
-                                    args.forEach((arg, i) => {
-                                        if (arg.getKind() === ts_morph_1.ts.SyntaxKind.StringLiteral) {
-                                            //console.log(chalk.green(`Mutation Name: ${arg.getText()}`));
-                                        }
-                                        if (arg.getKind() === ts_morph_1.ts.SyntaxKind.ObjectLiteralExpression) {
-                                            const properties = arg.getChildrenOfKind(ts_morph_1.ts.SyntaxKind.PropertyAssignment);
-                                            properties.forEach((property) => {
-                                                const name = property.getName();
-                                                const value = property.getText();
-                                                //console.log(chalk.green(`Mutation Prop #${i}: ${name} = ${value}`));
-                                                old_tRPC_Routers.push({
-                                                    routerName: expressionName,
-                                                    type: "mutation",
-                                                    query: arg.getText(),
-                                                    input: value,
-                                                });
+                                        else {
+                                            console.log("router does not exist");
+                                            v9Routers.set(variableDec.getFullText(), {
+                                                routerName: variableDec.getFullText(),
+                                                methods: [
+                                                    {
+                                                        index: 0,
+                                                        type: [
+                                                            {
+                                                                name: child.getText(),
+                                                                type: "query",
+                                                                input: "",
+                                                                output: "",
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
                                             });
                                         }
-                                    });
+                                    }
+                                    else if (variableDec && child && identifier.getFullText() === "mutation") {
+                                        const existingRouter = v9Routers.get(variableDec.getFullText());
+                                        if (existingRouter) {
+                                            console.log("router exists");
+                                            existingRouter.methods.push({
+                                                index: existingRouter.methods.length,
+                                                type: [
+                                                    {
+                                                        name: child.getText(),
+                                                        type: "mutation",
+                                                        input: "",
+                                                        output: "",
+                                                    },
+                                                ],
+                                            });
+                                        }
+                                        else {
+                                            console.log("router does not exist");
+                                            v9Routers.set(variableDec.getFullText(), {
+                                                routerName: variableDec.getFullText(),
+                                                methods: [
+                                                    {
+                                                        index: 0,
+                                                        type: [
+                                                            {
+                                                                name: child.getText(),
+                                                                type: "mutation",
+                                                                input: "",
+                                                                output: "",
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                            });
+                                        }
+                                    }
                                 }
-                            }
-                            if (descendant
-                                .getExpression()
-                                .getText()
-                                .split(".")
-                                .find((x) => x === "subscription")) {
-                                // descendant is a subscription
-                                console.log(chalk_1.default.green(`Found subscription ${descendant.getText()}`));
-                            }
-                            if (descendant
-                                .getExpression()
-                                .getText()
-                                .split(".")
-                                .find((x) => x === "middleware")) {
-                                // descendant is an error
-                                console.log(chalk_1.default.green(`Found middleware ${descendant.getText()}`));
-                            }
+                            });
                         }
-                    }
+                    });
                 }
             });
         });
     });
-    console.log(chalk_1.default.green(`Found ${old_tRPC_Routers.length} tRPC routers`));
-    console.log(chalk_1.default.green(`Writing tRPC routers to file...`));
-    const tRPC_Routers_json = JSON.stringify(old_tRPC_Routers, null, 2);
-    fs_1.default.writeFileSync("./tRPC_Routers.json", tRPC_Routers_json);
-    console.log(chalk_1.default.green(`Done!`));
-    const newRouters = new Set(old_tRPC_Routers);
-    console.log(newRouters);
+    // console.log a table of all routers and their methods
+    console.log(chalk_1.default.blue("\nRouters:"));
+    v9Routers.forEach((router) => {
+        console.log(chalk_1.default.blue(`\nRouter Name:${router.routerName}`));
+        const queries = router.methods.filter((method) => method.type[0].type === "query");
+        const mutations = router.methods.filter((method) => method.type[0].type === "mutation");
+        if (queries.length > 0) {
+            console.log(chalk_1.default.blue(`    Queries:`));
+            queries.forEach((query) => {
+                console.log(chalk_1.default.blue(`      ${query.type[0].name}`));
+            });
+        }
+        if (mutations.length > 0) {
+            console.log(chalk_1.default.blue(`    Mutations:`));
+            mutations.forEach((mutation) => {
+                console.log(chalk_1.default.blue(`      ${mutation.type[0].name}`));
+            });
+        }
+    });
+    console.log(chalk_1.default.green("Done discovering tRPC routers"));
 };
 exports.default = discover;
-//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZGlzY292ZXIuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyIuLi8uLi9iaW4vdHJhbnNmb3Jtcy9kaXNjb3Zlci50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7OztBQUFBLCtCQUE0QjtBQUM1Qix1Q0FBeUY7QUFDekYsNENBQW9CO0FBQ3BCLGtEQUEwQjtBQUsxQixNQUFNLFFBQVEsR0FBRyxHQUFHLEVBQUU7SUFDcEIsT0FBTyxDQUFDLEdBQUcsQ0FBQyxlQUFLLENBQUMsS0FBSyxDQUFDLDZCQUE2QixDQUFDLENBQUMsQ0FBQztJQUN4RCxNQUFNLFlBQVksR0FBRyxXQUFJLENBQUMsSUFBSSxDQUFDLFNBQVMsRUFBRTtRQUN4QyxHQUFHLEVBQUUsT0FBTyxDQUFDLEdBQUcsRUFBRTtRQUNsQixNQUFNLEVBQUUsQ0FBQyxvQkFBb0IsRUFBRSxXQUFXLENBQUM7UUFDM0MsS0FBSyxFQUFFLElBQUk7UUFDWCxRQUFRLEVBQUUsSUFBSTtLQUNmLENBQUMsQ0FBQztJQUNILE9BQU8sQ0FBQyxHQUFHLENBQUMsZUFBSyxDQUFDLEtBQUssQ0FBQyxTQUFTLFlBQVksQ0FBQyxNQUFNLFlBQVksQ0FBQyxDQUFDLENBQUM7SUFDbkUsTUFBTSxnQkFBZ0IsR0FBc0IsRUFBRSxDQUFDO0lBQy9DLE1BQU0sT0FBTyxHQUFHLElBQUksa0JBQU8sRUFBRSxDQUFDO0lBQzlCLE9BQU8sQ0FBQyxxQkFBcUIsQ0FBQyxZQUFZLENBQUMsQ0FBQztJQUM1QyxPQUFPLENBQUMsY0FBYyxFQUFFLENBQUMsT0FBTyxDQUFDLENBQUMsVUFBVSxFQUFFLEVBQUU7UUFDOUMsVUFBVSxDQUFDLGFBQWEsRUFBRSxDQUFDLE9BQU8sQ0FBQyxDQUFDLFNBQVMsRUFBRSxFQUFFO1lBQy9DLE1BQU0sV0FBVyxHQUFHLFNBQVMsQ0FBQyxvQkFBb0IsQ0FBQyxhQUFFLENBQUMsVUFBVSxDQUFDLGNBQWMsQ0FBQyxDQUFDO1lBQ2pGLFdBQVcsQ0FBQyxPQUFPLENBQUMsQ0FBQyxVQUFV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
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZGlzY292ZXIuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyIuLi8uLi9iaW4vdHJhbnNmb3Jtcy9kaXNjb3Zlci50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7OztBQUFBLCtCQUE0QjtBQUM1Qix1Q0FBeUY7QUFFekYsa0RBQTBCO0FBTTFCLE1BQU0sUUFBUSxHQUFHLEdBQUcsRUFBRTtJQUNwQixPQUFPLENBQUMsR0FBRyxDQUFDLGVBQUssQ0FBQyxLQUFLLENBQUMsNkJBQTZCLENBQUMsQ0FBQyxDQUFDO0lBQ3hELE1BQU0sWUFBWSxHQUFHLFdBQUksQ0FBQyxJQUFJLENBQUMsU0FBUyxFQUFFO1FBQ3hDLEdBQUcsRUFBRSxPQUFPLENBQUMsR0FBRyxFQUFFO1FBQ2xCLE1BQU0sRUFBRSxDQUFDLG9CQUFvQixFQUFFLFdBQVcsQ0FBQztRQUMzQyxLQUFLLEVBQUUsSUFBSTtRQUNYLFFBQVEsRUFBRSxJQUFJO0tBQ2YsQ0FBQyxDQUFDO0lBQ0gsT0FBTyxDQUFDLEdBQUcsQ0FBQyxlQUFLLENBQUMsS0FBSyxDQUFDLFNBQVMsWUFBWSxDQUFDLE1BQU0sWUFBWSxDQUFDLENBQUMsQ0FBQztJQUVuRSxNQUFNLFNBQVMsR0FBRyxJQUFJLEdBQUcsRUFBb0IsQ0FBQztJQUM5QyxNQUFNLE9BQU8sR0FBRyxJQUFJLGtCQUFPLEVBQUUsQ0FBQztJQUM5QixPQUFPLENBQUMscUJBQXFCLENBQUMsWUFBWSxDQUFDLENBQUM7SUFDNUMsT0FBTyxDQUFDLGNBQWMsRUFBRSxDQUFDLE9BQU8sQ0FBQyxDQUFDLFVBQVUsRUFBRSxFQUFFO1FBQzlDLFVBQVUsQ0FBQyxhQUFhLEVBQUUsQ0FBQyxPQUFPLENBQUMsQ0FBQyxTQUFTLEVBQUUsRUFBRTtZQUMvQyxNQUFNLFdBQVcsR0FBRyxTQUFTLENBQUMsb0JBQW9CLENBQUMsYUFBRSxDQUFDLFVBQVUsQ0FBQyx3QkFBd0IsQ0FBQyxDQUFDO1lBQzNGLFdBQVcsQ0FBQyxPQUFPLENBQUMsQ0FBQyxVQUFVLEVB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
