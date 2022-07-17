@@ -1,6 +1,7 @@
 export interface v9Router {
   routerName: string;
-  methods: Method[];
+  methods?: Method[];
+  transformer?: Transformer;
 }
 
 export interface v9Query {
@@ -22,4 +23,10 @@ interface Method {
   type: [v9Query | v9Mutation];
   input?: string;
   output?: string;
+}
+
+interface Transformer {
+  name: string;
+  index?: number;
+  type: string;
 }

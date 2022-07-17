@@ -36,12 +36,10 @@ const discover = () => {
             if (sibling.getKind() === ts.SyntaxKind.SyntaxList) {
               sibling.getChildren().forEach((child) => {
                 if (child.getKind() === ts.SyntaxKind.StringLiteral) {
-                  console.log(chalk.blue(`${identifier.getFullText()} name: ${child.getText()}\n`));
                   if (variableDec && child && identifier.getFullText() === "query") {
                     const existingRouter = v9Routers.get(variableDec.getFullText());
                     if (existingRouter) {
-                      existingRouter.methods.push({
-                        index: existingRouter.methods.length,
+                      existingRouter.methods?.push({
                         type: [{ name: child.getText(), type: "query" }],
                       });
                     } else {
@@ -65,8 +63,7 @@ const discover = () => {
                   } else if (variableDec && child && identifier.getFullText() === "mutation") {
                     const existingRouter = v9Routers.get(variableDec.getFullText());
                     if (existingRouter) {
-                      existingRouter.methods.push({
-                        index: existingRouter.methods.length,
+                      existingRouter.methods?.push({
                         type: [
                           {
                             name: child.getText(),
@@ -81,7 +78,6 @@ const discover = () => {
                         routerName: variableDec.getFullText(),
                         methods: [
                           {
-                            index: 0,
                             type: [
                               {
                                 name: child.getText(),
@@ -92,6 +88,28 @@ const discover = () => {
                             ],
                           },
                         ],
+                      });
+                    }
+                  }
+                } else if (child.getKind() === ts.SyntaxKind.Identifier) {
+                  if (variableDec && child && identifier.getFullText() === "transformer") {
+                    console.log("in transformer");
+                    console.log(child.getText());
+
+                    const existingRouter = v9Routers.get(variableDec.getFullText());
+
+                    if (existingRouter) {
+                      existingRouter.transformer = {
+                        name: child.getText(),
+                        type: "transformer",
+                      };
+                    } else {
+                      v9Routers.set(variableDec.getFullText(), {
+                        routerName: variableDec.getFullText(),
+                        transformer: {
+                          name: child.getText(),
+                          type: "transformer",
+                        },
                       });
                     }
                   }
@@ -106,16 +124,21 @@ const discover = () => {
   console.log(chalk.blue("\nRouters:"));
   v9Routers.forEach((router) => {
     console.log(chalk.blue(`\nRouter Name:${router.routerName}`));
-    const queries = router.methods.filter((method) => method.type[0].type === "query");
-    const mutations = router.methods.filter((method) => method.type[0].type === "mutation");
-    if (queries.length > 0) {
+    const queries = router.methods?.filter((method) => method.type[0].type === "query");
+    const mutations = router.methods?.filter((method) => method.type[0].type === "mutation");
+    const transformer = router.transformer;
+    if (transformer) {
+      console.log(chalk.blue(`    Transformer:`));
+      console.log(chalk.blue(`      ${transformer.name}`));
+    }
+    if (queries && queries.length > 0) {
       console.log(chalk.blue(`    Queries:`));
       queries.forEach((query) => {
         console.log(chalk.blue(`      ${query.type[0].name}`));
       });
     }
 
-    if (mutations.length > 0) {
+    if (mutations && mutations.length > 0) {
       console.log(chalk.blue(`    Mutations:`));
       mutations.forEach((mutation) => {
         console.log(chalk.blue(`      ${mutation.type[0].name}`));
